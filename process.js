@@ -28,8 +28,8 @@ async function processFiles() {
         process.exit(1);
     }
 
-    // Danh sách các model thử nghiệm nếu model chính bị bận/thay đổi
-    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
+    // Tên model được cập nhật chuẩn theo thông báo mới nhất từ API
+    const models = ['gemini-3.8-flash', 'gemini-1.5-flash'];
 
     for (const file of files) {
         if (!file.endsWith('.txt')) continue;
