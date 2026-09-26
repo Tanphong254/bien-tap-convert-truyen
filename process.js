@@ -28,6 +28,9 @@ async function processFiles() {
         process.exit(1);
     }
 
+    // Danh sách các model thử nghiệm nếu model chính bị bận/thay đổi
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
+
     for (const file of files) {
         if (!file.endsWith('.txt')) continue;
         
@@ -37,34 +40,43 @@ async function processFiles() {
         console.log(`Đang xử lý file: ${file}...`);
         const content = fs.readFileSync(inputPath, 'utf8');
 
-        try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [
-                        {
-                            role: 'user',
-                            parts: [
-                                { text: systemPrompt + "\n\nĐoạn văn bản Convert cần biên tập:\n\n" + content }
-                            ]
-                        }
-                    ]
-                })
-            });
+        let success = false;
 
-            const data = await response.json();
-            if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-                const resultText = data.candidates[0].content.parts[0].text;
-                fs.writeFileSync(outputPath, resultText, 'utf8');
-                console.log(`Đã hoàn thành file: ${file}`);
-            } else {
-                console.error(`Lỗi từ Gemini API cho file ${file}:`, JSON.stringify(data));
-                process.exit(1);
+        for (const model of models) {
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [
+                            {
+                                role: 'user',
+                                parts: [
+                                    { text: systemPrompt + "\n\nĐoạn văn bản Convert cần biên tập:\n\n" + content }
+                                ]
+                            }
+                        ]
+                    })
+                });
+
+                const data = await response.json();
+                if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+                    const resultText = data.candidates[0].content.parts[0].text;
+                    fs.writeFileSync(outputPath, resultText, 'utf8');
+                    console.log(`Đã hoàn thành file: ${file} (sử dụng model ${model})`);
+                    success = true;
+                    break;
+                } else {
+                    console.warn(`Model ${model} không phản hồi kết quả hợp lệ:`, JSON.stringify(data));
+                }
+            } catch (err) {
+                console.warn(`Thử model ${model} thất bại:`, err.message);
             }
-        } catch (err) {
-            console.error(`Lỗi kết nối cho file ${file}:`, err);
+        }
+
+        if (!success) {
+            console.error(`Không thể xử lý file ${file} với tất cả các model khả dụng.`);
             process.exit(1);
         }
     }
