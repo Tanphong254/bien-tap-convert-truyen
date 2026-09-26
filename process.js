@@ -5,7 +5,7 @@ const inputFolder = './input';
 const outputFolder = './output';
 
 if (!fs.existsSync(outputFolder)) {
-    fs.mkdirSync(outputFolder);
+    fs.mkdirSync(outputFolder, { recursive: true });
 }
 
 const systemPrompt = `Bạn là một biên tập viên webnovel tiếng Việt kỳ cựu. Nhiệm vụ của bạn là nhận vào đoạn văn bản dịch thô/Convert và viết lại thành văn phong thuần Việt mượt mà, hấp dẫn như một tác giả Việt Nam tự sáng tác.
@@ -15,8 +15,18 @@ Quy tắc:
 3. Tuyệt đối không tóm tắt hay bỏ sót tình tiết.`;
 
 async function processFiles() {
+    if (!fs.existsSync(inputFolder)) {
+        console.log("Thư mục input chưa tồn tại.");
+        return;
+    }
+
     const files = fs.readdirSync(inputFolder);
     const apiKey = process.env.AI_API_KEY;
+
+    if (!apiKey) {
+        console.error("Lỗi: Không tìm thấy AI_API_KEY trong Environment Secrets!");
+        process.exit(1);
+    }
 
     for (const file of files) {
         if (!file.endsWith('.txt')) continue;
@@ -24,8 +34,6 @@ async function processFiles() {
         const inputPath = path.join(inputFolder, file);
         const outputPath = path.join(outputFolder, file);
         
-        if (fs.existsSync(outputPath)) continue;
-
         console.log(`Đang xử lý file: ${file}...`);
         const content = fs.readFileSync(inputPath, 'utf8');
 
@@ -35,12 +43,14 @@ async function processFiles() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: systemPrompt },
-                            { text: `Đoạn văn bản Convert cần biên tập:\n\n${content}` }
-                        ]
-                    }]
+                    contents: [
+                        {
+                            role: 'user',
+                            parts: [
+                                { text: systemPrompt + "\n\nĐoạn văn bản Convert cần biên tập:\n\n" + content }
+                            ]
+                        }
+                    ]
                 })
             });
 
@@ -51,9 +61,11 @@ async function processFiles() {
                 console.log(`Đã hoàn thành file: ${file}`);
             } else {
                 console.error(`Lỗi từ Gemini API cho file ${file}:`, JSON.stringify(data));
+                process.exit(1);
             }
         } catch (err) {
             console.error(`Lỗi kết nối cho file ${file}:`, err);
+            process.exit(1);
         }
     }
 }
