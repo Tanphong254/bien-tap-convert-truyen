@@ -40,15 +40,16 @@ async function callGeminiApi(model, apiKey, promptText, maxRetries = 5) {
                 return data.candidates[0].content.parts[0].text;
             }
 
-            // Nếu gặp lỗi quá tải 503 hoặc server bận, chờ 5 giây rồi thử lại
+            // Xử lý khi gặp lỗi 503 (Server bận / quá tải)
             if (data.error && (data.error.code === 503 || data.error.status === 'UNAVAILABLE')) {
-                console.warn(`Model ${model} đang bận (Lần thử ${attempt}/${maxRetries}). Đợi 5s thử lại...`);
-                await delay(5000);
+                const waitTime = attempt * 5000; // Chờ 5s, 10s, 15s...
+                console.warn(`Model ${model} đang bận (Lần thử ${attempt}/${maxRetries}). Đợi ${waitTime / 1000}s thử lại...`);
+                await delay(waitTime);
                 continue;
             }
 
-            console.warn(`Model ${model} không khả dụng (${data.error?.code || 'Invalid response'}): ${data.error?.message || ''}`);
-            break; // Nếu lỗi 404 hoặc lỗi khác thì chuyển model tiếp theo ngay
+            console.warn(`Model ${model} không khả dụng (${data.error?.code || 'Lỗi'}): ${data.error?.message || ''}`);
+            break; // Nếu lỗi 404 (Không tồn tại), bỏ qua model này ngay
         } catch (err) {
             console.warn(`Lỗi kết nối tới ${model} (Lần ${attempt}):`, err.message);
             await delay(3000);
@@ -71,8 +72,8 @@ async function processFiles() {
         process.exit(1);
     }
 
-    // Danh sách các model chuẩn trên Google Gemini API v1beta
-    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3.8-flash'];
+    // Danh sách các model đang hoạt động chuẩn nhất của Gemini
+    const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash'];
 
     for (const file of files) {
         if (!file.endsWith('.txt')) continue;
